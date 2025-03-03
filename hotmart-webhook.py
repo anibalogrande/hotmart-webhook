@@ -1,27 +1,46 @@
-import json
+import sqlite3
 from flask import Flask, request, jsonify
 import os
 
 app = Flask(__name__)
 
-# Nome do arquivo onde os dados serão armazenados
-DB_FILE = "usuarios.json"
+# Nome do banco de dados
+DB_FILE = "usuarios.db"
 
-# Função para carregar os usuários do arquivo JSON
-def carregar_usuarios():
-    try:
-        with open(DB_FILE, "r") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {}
+# Função para inicializar o banco de dados
+def inicializar_db():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS usuarios (
+            email TEXT PRIMARY KEY,
+            status TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
 
-# Função para salvar os usuários no arquivo JSON
-def salvar_usuarios(usuarios):
-    with open(DB_FILE, "w") as f:
-        json.dump(usuarios, f)
-    print("🔹 Arquivo atualizado:", usuarios)
-# Inicializa os usuários carregando do arquivo
-usuarios = carregar_usuarios()
+# Função para salvar um usuário no banco de dados
+def salvar_usuario(email, status):
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT OR REPLACE INTO usuarios (email, status) VALUES (?, ?)
+    ''', (email, status))
+    conn.commit()
+    conn.close()
+
+# Função para buscar o status de um usuário no banco de dados
+def verificar_usuario_db(email):
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute('SELECT status FROM usuarios WHERE email = ?', (email,))
+    resultado = cursor.fetchone()
+    conn.close()
+    return resultado[0] if resultado else "inexistente"
+
+# Inicializa o banco de dados ao iniciar o servidor
+inicializar_db()
 
 @app.route('/webhook', methods=['POST'])
 def receber_notificacao():
@@ -38,14 +57,11 @@ def receber_notificacao():
 
     if email:
         if status == "APPROVED":  # Pagamento aprovado
-            usuarios[email] = "ativo"
+            salvar_usuario(email, "ativo")
         elif status in ["CANCELED", "CHARGEBACK", "EXPIRED", "REFUNDED"]:  # Cancelado
-            usuarios[email] = "cancelado"
+            salvar_usuario(email, "cancelado")
 
-        # Salvar os usuários no arquivo JSON para persistência
-        salvar_usuarios(usuarios)
-
-    print("🔹 Usuários registrados:", usuarios)  # Debug
+    print(f"🔹 Usuário {email} salvo como {status}")  # Debug
 
     return jsonify({"status": "sucesso", "mensagem": "Notificação recebida"}), 200
 
@@ -55,9 +71,7 @@ def verificar_usuario():
     if not email:
         return jsonify({"status": "erro", "mensagem": "Informe um email"}), 400
 
-    # Recarregar os usuários do arquivo antes de consultar
-    usuarios_atualizados = carregar_usuarios()
-    status = usuarios_atualizados.get(email, "inexistente")
+    status = verificar_usuario_db(email)
 
     return jsonify({"status": status})
 
