@@ -1,15 +1,19 @@
-import sqlite3
-from flask import Flask, request, jsonify
 import os
+import psycopg2
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# Nome do banco de dados
-DB_FILE = "usuarios.db"
+# Configuração do banco PostgreSQL (pegue a Connection String do Render)
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgres://usuario:senha@host:porta/dbname")
 
-# Função para inicializar o banco de dados
+# Função para conectar ao banco
+def conectar_db():
+    return psycopg2.connect(DATABASE_URL, sslmode="require")
+
+# Criar tabela de usuários
 def inicializar_db():
-    conn = sqlite3.connect(DB_FILE)
+    conn = conectar_db()
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS usuarios (
@@ -20,26 +24,27 @@ def inicializar_db():
     conn.commit()
     conn.close()
 
-# Função para salvar um usuário no banco de dados
+# Função para salvar um usuário no banco
 def salvar_usuario(email, status):
-    conn = sqlite3.connect(DB_FILE)
+    conn = conectar_db()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT OR REPLACE INTO usuarios (email, status) VALUES (?, ?)
+        INSERT INTO usuarios (email, status) VALUES (%s, %s)
+        ON CONFLICT (email) DO UPDATE SET status = EXCLUDED.status
     ''', (email, status))
     conn.commit()
     conn.close()
 
-# Função para buscar o status de um usuário no banco de dados
+# Função para buscar um usuário no banco
 def verificar_usuario_db(email):
-    conn = sqlite3.connect(DB_FILE)
+    conn = conectar_db()
     cursor = conn.cursor()
-    cursor.execute('SELECT status FROM usuarios WHERE email = ?', (email,))
+    cursor.execute('SELECT status FROM usuarios WHERE email = %s', (email,))
     resultado = cursor.fetchone()
     conn.close()
     return resultado[0] if resultado else "inexistente"
 
-# Inicializa o banco de dados ao iniciar o servidor
+# Inicializa o banco ao iniciar o servidor
 inicializar_db()
 
 @app.route('/webhook', methods=['POST'])
