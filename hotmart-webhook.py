@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+import os
 
 app = Flask(__name__)
 
@@ -7,32 +8,30 @@ usuarios = {}
 
 @app.route('/webhook', methods=['POST'])
 def receber_notificacao():
-    dados = request.json  # Recebe os dados da Hotmart
+    dados = request.json
     if not dados:
         return jsonify({"status": "erro", "mensagem": "Sem dados"}), 400
-    
+
     email = dados.get('buyer', {}).get('email')
-    status = dados.get('status')  # Status da compra
-    
+    status = dados.get('status')
+
     if email:
-        if status == "APPROVED":  # Pagamento aprovado
+        if status == "APPROVED":
             usuarios[email] = "ativo"
-        elif status in ["CANCELED", "CHARGEBACK", "EXPIRED", "REFUNDED"]:  # Cancelado, reembolsado
+        elif status in ["CANCELED", "CHARGEBACK", "EXPIRED", "REFUNDED"]:
             usuarios[email] = "cancelado"
-    
+
     return jsonify({"status": "sucesso", "mensagem": "Notificação recebida"}), 200
 
 @app.route('/verificar_usuario', methods=['GET'])
 def verificar_usuario():
     email = request.args.get('email')
-    import os
+    if not email:
+        return jsonify({"status": "erro", "mensagem": "Informe um email"}), 400
 
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 10000))  # Usa a porta fornecida pelo Render
-    app.run(host='0.0.0.0', port=port, debug=True)
-
-    status = usuarios.get(email, "inexistente")  # Se não estiver no banco, é inexistente
+    status = usuarios.get(email, "inexistente")
     return jsonify({"status": status})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000, debug=True)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port, debug=True)
