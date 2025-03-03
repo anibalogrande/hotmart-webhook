@@ -19,7 +19,7 @@ def carregar_usuarios():
 def salvar_usuarios(usuarios):
     with open(DB_FILE, "w") as f:
         json.dump(usuarios, f)
-
+    print("🔹 Arquivo atualizado:", usuarios)
 # Inicializa os usuários carregando do arquivo
 usuarios = carregar_usuarios()
 
