@@ -1,10 +1,27 @@
+import json
 from flask import Flask, request, jsonify
 import os
 
 app = Flask(__name__)
 
-# Simulando um banco de dados temporário (variável global)
-usuarios = {}
+# Nome do arquivo onde os dados serão armazenados
+DB_FILE = "usuarios.json"
+
+# Função para carregar os usuários do arquivo JSON
+def carregar_usuarios():
+    try:
+        with open(DB_FILE, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+# Função para salvar os usuários no arquivo JSON
+def salvar_usuarios(usuarios):
+    with open(DB_FILE, "w") as f:
+        json.dump(usuarios, f)
+
+# Inicializa os usuários carregando do arquivo
+usuarios = carregar_usuarios()
 
 @app.route('/webhook', methods=['POST'])
 def receber_notificacao():
@@ -22,8 +39,11 @@ def receber_notificacao():
     if email:
         if status == "APPROVED":  # Pagamento aprovado
             usuarios[email] = "ativo"
-        elif status in ["CANCELED", "CHARGEBACK", "EXPIRED", "REFUNDED"]:  # Cancelamento
+        elif status in ["CANCELED", "CHARGEBACK", "EXPIRED", "REFUNDED"]:  # Cancelado
             usuarios[email] = "cancelado"
+
+        # Salvar os usuários no arquivo JSON para persistência
+        salvar_usuarios(usuarios)
 
     print("🔹 Usuários registrados:", usuarios)  # Debug
 
@@ -35,7 +55,10 @@ def verificar_usuario():
     if not email:
         return jsonify({"status": "erro", "mensagem": "Informe um email"}), 400
 
-    status = usuarios.get(email, "inexistente")
+    # Recarregar os usuários do arquivo antes de consultar
+    usuarios_atualizados = carregar_usuarios()
+    status = usuarios_atualizados.get(email, "inexistente")
+
     return jsonify({"status": status})
 
 if __name__ == '__main__':
