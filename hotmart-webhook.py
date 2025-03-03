@@ -25,9 +25,12 @@ def receber_notificacao():
 @app.route('/verificar_usuario', methods=['GET'])
 def verificar_usuario():
     email = request.args.get('email')
-    if not email:
-        return jsonify({"status": "erro", "mensagem": "Informe um email"}), 400
-    
+    import os
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 10000))  # Usa a porta fornecida pelo Render
+    app.run(host='0.0.0.0', port=port, debug=True)
+
     status = usuarios.get(email, "inexistente")  # Se não estiver no banco, é inexistente
     return jsonify({"status": status})
 
